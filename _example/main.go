@@ -109,7 +109,7 @@ func main() {
 
 	var song SongRaw
 
-	a := annotatorreader.New(binary.LittleEndian, bu)
+	a := annotatorreader.New(binary.BigEndian, bu)
 
 	err := a.Marshal(&song, "song")
 	if err != nil {
