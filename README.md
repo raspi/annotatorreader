@@ -135,4 +135,4 @@ func main() {
 
 Into this:
 
-![Image of Yaktocat](https://github.com/raspi/annotatorreader/_example/screenshot.png)
+![Example screenshot](https://github.com/raspi/annotatorreader/blob/master/_example/screenshot.png)
