@@ -179,11 +179,11 @@ func (bd *ReaderDumper) getHighlightEffect(k reflect.Kind, c clr.Color, i uint64
 	eff := clr.UnderlineFm
 
 	switch {
-	case i%2 == 0 && k == reflect.Uint16:
+	case i%2 == 0 && (k == reflect.Uint16 || k == reflect.Int16):
 		c = c | eff
-	case i%4 == 0 && k == reflect.Uint32:
+	case i%4 == 0 && (k == reflect.Uint32 || k == reflect.Int32):
 		c = c | eff
-	case i%8 == 0 && k == reflect.Uint64:
+	case i%8 == 0 && (k == reflect.Uint64 || k == reflect.Int64):
 		c = c | eff
 	}
 
