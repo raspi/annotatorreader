@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="run example" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="annotatorreader" />
+    <working_directory value="$PROJECT_DIR$/" />
+    <go_parameters value="-i" />
+    <kind value="DIRECTORY" />
+    <filePath value="$PROJECT_DIR$/" />
+    <package value="github.com/raspi/annotatorreader" />
+    <directory value="$PROJECT_DIR$/_example" />
+    <method v="2" />
+  </configuration>
+</component>
