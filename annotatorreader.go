@@ -84,10 +84,11 @@ func (bd *ReaderDumper) readInterface(v reflect.Value, name string) {
 		s := uint64(binary.Size(iface))
 
 		bd.DebugInfo[bd.currentOffset] = DebugInformation{
-			Size: s,
-			Name: name,
-			Kind: v.Kind(),
-			Type: v.Type(),
+			Size:  s,
+			Name:  name,
+			Kind:  v.Kind(),
+			Type:  v.Type(),
+			Value: &iface,
 		}
 
 		bd.currentOffset += Offset(s)
@@ -125,7 +126,7 @@ func (bd *ReaderDumper) Marshal(data interface{}, nameprefix string) (err error)
 				tmp := reflect.ValueOf(iface)
 
 				for i := 0; i < tmp.Len(); i++ {
-					bd.readInterface(reflect.ValueOf(tmp.Index(i).Interface()), strings.TrimSpace(fmt.Sprintf(`%v.%v [%v]`, nameprefix, t.Name, i)))
+					bd.readInterface(reflect.ValueOf(tmp.Index(i).Interface()), strings.TrimSpace(fmt.Sprintf(`%v.%v[%v]`, nameprefix, t.Name, i)))
 				}
 			} else {
 
@@ -163,6 +164,9 @@ func (bd *ReaderDumper) getVariableColor() clr.Color {
 	return bd.valuePerimeterColors[bd.lastVPC]
 }
 
+// Dump dumps readable hex dump where:
+// -each variable boundary line has it's own color
+// -ASCII, space, null etc characters have their own colors
 func (bd *ReaderDumper) Dump() string {
 	var sb strings.Builder
 
@@ -253,7 +257,28 @@ func (bd *ReaderDumper) Dump() string {
 				sb.WriteString(` `)
 			}
 
-			sb.WriteString(clr.Sprintf(`%[1]v: L: 0x%02[2]X %[2]v (%[3]v %[4]v)`, clr.Colorize(item.Name, bd.getVariableColor()), item.Size, clr.Bold(item.Kind), item.Type))
+			// Type
+			sb.WriteString(clr.Sprintf(`%v `, clr.Colorize(item.Type, bd.getVariableColor())))
+			// Name
+			sb.WriteString(clr.Sprintf(`%v: `, clr.Colorize(item.Name, bd.getVariableColor())))
+			// Length of data
+			sb.WriteString(clr.Sprintf(`L: 0x%02[1]X %[1]v `, item.Size))
+
+			if item.Value != nil {
+				// Value
+				switch (*item.Value).(type) {
+				case uint8, int8:
+					sb.WriteString(clr.Sprintf(`V: 0x%02[1]x %[1]v`, *item.Value))
+				case uint16, int16:
+					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+				case uint32, int32:
+					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+				case uint64, int64:
+					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+				case uint, int:
+					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+				}
+			}
 
 			sb.WriteString("\n")
 		}
