@@ -41,6 +41,7 @@ func (bd *ReaderDumper) Seek(offset Offset, whence int) (Offset, error) {
 	return Offset(off), err
 }
 
+// Offset returns file's current offset
 func (bd *ReaderDumper) Offset() (Offset, error) {
 	off, err := bd.r.Seek(0, io.SeekCurrent)
 	return Offset(off), err
@@ -147,6 +148,13 @@ func (bd *ReaderDumper) Marshal(data interface{}, nameprefix string) (err error)
 	return err
 }
 
+func (bd *ReaderDumper) getLastKind(v reflect.Value) reflect.Kind {
+	v = bd.unpackValue(v)
+	tree := reflTree{}
+	tree.getTree(v)
+	return tree.Tree[len(tree.Tree)-1]
+}
+
 func (bd *ReaderDumper) readBytes(data []byte) (n int, err error) {
 	return bd.r.Read(data)
 }
@@ -162,6 +170,22 @@ func (bd *ReaderDumper) nextColor() {
 
 func (bd *ReaderDumper) getVariableColor() clr.Color {
 	return bd.valuePerimeterColors[bd.lastVPC]
+}
+
+// Highlight every mod X first integer
+func (bd *ReaderDumper) getHighlightEffect(k reflect.Kind, c clr.Color, i uint64) clr.Color {
+	eff := clr.UnderlineFm
+
+	switch {
+	case i%2 == 0 && k == reflect.Uint16:
+		c = c | eff
+	case i%4 == 0 && k == reflect.Uint32:
+		c = c | eff
+	case i%8 == 0 && k == reflect.Uint64:
+		c = c | eff
+	}
+
+	return c
 }
 
 // Dump dumps readable hex dump where:
@@ -182,6 +206,7 @@ func (bd *ReaderDumper) Dump() string {
 	for _, startingOffset := range startingOffsetsSorted {
 		_, _ = bd.Seek(startingOffset, io.SeekStart)
 		item := bd.DebugInfo[startingOffset]
+		lastKind := bd.getLastKind(reflect.ValueOf(item.Value))
 
 		byts := make([]byte, item.Size)
 		_, _ = bd.r.Read(byts)
@@ -192,6 +217,7 @@ func (bd *ReaderDumper) Dump() string {
 
 			paddingRequired := 16
 
+			// ---- Print character's hex presentation
 			for i := uint64(0); i < 16; i++ {
 				if idx+i >= item.Size {
 					break
@@ -199,16 +225,17 @@ func (bd *ReaderDumper) Dump() string {
 
 				paddingRequired--
 
-				// Print character's hex presentation
 				b := byts[idx+i]
 
 				color, ok := bd.characterColors[b]
 
 				if !ok {
-					sb.WriteString(clr.Sprintf(`%02x`, b))
-				} else {
-					sb.WriteString(clr.Sprintf(`%02x`, clr.Colorize(b, color)))
+					color = clr.WhiteFg
 				}
+
+				color = bd.getHighlightEffect(lastKind, color, i)
+
+				sb.WriteString(clr.Sprintf(`%02x`, clr.Colorize(b, color)))
 
 				sb.WriteString(` `)
 
@@ -227,36 +254,38 @@ func (bd *ReaderDumper) Dump() string {
 				sb.WriteString(`   `)
 			}
 
-			// Show ASCII characters
 			sb.WriteString(` `)
 			sb.WriteString(clr.Sprintf(`%v`, clr.Bold(`|`)))
 
+			// ---- Show ASCII characters
 			for i := uint64(0); i < 16; i++ {
 				if idx+i >= item.Size {
 					break
 				}
 
-				// Print character's hex presentation
+				// Print character's ASCII presentation
 				b := byts[idx+i]
 
 				color, ok := bd.characterColors[b]
 
 				if !ok {
-					sb.WriteString(fmt.Sprintf(`%c`, bd.toChar(b)))
-				} else {
-					sb.WriteString(fmt.Sprintf(`%c`, clr.Colorize(bd.toChar(b), color)))
+					color = clr.WhiteFg
 				}
+
+				color = bd.getHighlightEffect(lastKind, color, i)
+
+				sb.WriteString(fmt.Sprintf(`%c`, clr.Colorize(bd.toChar(b), color)))
 
 			}
 
 			sb.WriteString(clr.Sprintf(`%v`, clr.Bold(`|`)))
 			sb.WriteString(` `)
 
-			// Variable names
 			for i := 0; i < paddingRequired; i++ {
 				sb.WriteString(` `)
 			}
 
+			// --- Variable information
 			// Type
 			sb.WriteString(clr.Sprintf(`%v `, clr.Colorize(item.Type, bd.getVariableColor())))
 			// Name
