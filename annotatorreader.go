@@ -81,15 +81,17 @@ func (bd *ReaderDumper) toChar(b byte) byte {
 func (bd *ReaderDumper) readInterface(v reflect.Value, name string) {
 	if v.CanInterface() {
 		iface := v.Interface()
+		val := &iface
 
 		s := uint64(binary.Size(iface))
 
 		bd.DebugInfo[bd.currentOffset] = DebugInformation{
-			Size:  s,
-			Name:  name,
-			Kind:  v.Kind(),
-			Type:  v.Type(),
-			Value: &iface,
+			Size:     s,
+			Name:     name,
+			Kind:     v.Kind(),
+			Type:     v.Type(),
+			Value:    val,
+			LastKind: bd.getLastKind(reflect.ValueOf(val)),
 		}
 
 		bd.currentOffset += Offset(s)
@@ -206,7 +208,6 @@ func (bd *ReaderDumper) Dump() string {
 	for _, startingOffset := range startingOffsetsSorted {
 		_, _ = bd.Seek(startingOffset, io.SeekStart)
 		item := bd.DebugInfo[startingOffset]
-		lastKind := bd.getLastKind(reflect.ValueOf(item.Value))
 
 		byts := make([]byte, item.Size)
 		_, _ = bd.r.Read(byts)
@@ -233,7 +234,7 @@ func (bd *ReaderDumper) Dump() string {
 					color = clr.WhiteFg
 				}
 
-				color = bd.getHighlightEffect(lastKind, color, i)
+				color = bd.getHighlightEffect(item.LastKind, color, i)
 
 				sb.WriteString(clr.Sprintf(`%02x`, clr.Colorize(b, color)))
 
@@ -272,7 +273,7 @@ func (bd *ReaderDumper) Dump() string {
 					color = clr.WhiteFg
 				}
 
-				color = bd.getHighlightEffect(lastKind, color, i)
+				color = bd.getHighlightEffect(item.LastKind, color, i)
 
 				sb.WriteString(fmt.Sprintf(`%c`, clr.Colorize(bd.toChar(b), color)))
 
