@@ -1,5 +1,15 @@
 # Annotator Reader Dumper
 
+Annotate file offsets with meaningful variable names while you marshal structures from a `io.Reader`.
+
+## Why?
+
+Sometimes you need to make sense of weird binary file formats and reading a hex dump while assigning variables usually causes headache. Usually it's one-off error or wrong file offset. 
+
+So normally while you are constructing those structs you usually are guessing the types from non-existing documentation. Now you can get a nice clear hex dump of what's going on and where.
+
+## Example
+
 Turn this:
 
 ```go
