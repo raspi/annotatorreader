@@ -11,7 +11,6 @@ import (
 )
 
 type Offset int64
-type DebugInfoMap map[Offset]DebugInformation
 
 type ReaderDumper struct {
 	Endian               binary.ByteOrder
@@ -21,13 +20,7 @@ type ReaderDumper struct {
 	valuePerimeterColors []clr.Color
 	lastVPC              int // last used valuePerimeterColor
 	characterColors      map[uint8]clr.Color
-}
-
-type DebugInformation struct {
-	Name string
-	Size uint64
-	Kind reflect.Kind
-	Type reflect.Type
+	endianDumps          []binary.ByteOrder
 }
 
 func New(endiannessType binary.ByteOrder, rdr io.ReadSeeker) ReaderDumper {
@@ -39,6 +32,7 @@ func New(endiannessType binary.ByteOrder, rdr io.ReadSeeker) ReaderDumper {
 		valuePerimeterColors: []clr.Color{clr.CyanFg, clr.MagentaFg, clr.GreenFg, clr.BlueFg, clr.YellowFg},
 		lastVPC:              0,
 		characterColors:      defaultCharacterColors,
+		endianDumps:          []binary.ByteOrder{endiannessType},
 	}
 }
 
@@ -85,7 +79,9 @@ func (bd *ReaderDumper) toChar(b byte) byte {
 
 func (bd *ReaderDumper) readInterface(v reflect.Value, name string) {
 	if v.CanInterface() {
-		s := uint64(binary.Size(v.Interface()))
+		iface := v.Interface()
+
+		s := uint64(binary.Size(iface))
 
 		bd.DebugInfo[bd.currentOffset] = DebugInformation{
 			Size: s,
@@ -95,6 +91,8 @@ func (bd *ReaderDumper) readInterface(v reflect.Value, name string) {
 		}
 
 		bd.currentOffset += Offset(s)
+	} else {
+		panic(`no interfacing!!?!?!`)
 	}
 }
 
@@ -114,10 +112,27 @@ func (bd *ReaderDumper) Marshal(data interface{}, nameprefix string) (err error)
 			return err
 		}
 
+		var rtree reflTree
+
 		for i := 0; i < rdv.NumField(); i++ {
 			f := rdv.Field(i)
 			t := rdt.Field(i)
-			bd.readInterface(f, strings.TrimSpace(fmt.Sprintf(`%v.%v`, nameprefix, t.Name)))
+
+			rtree.getTree(f)
+
+			if len(rtree.Tree) > 2 && rtree.Tree[0] == reflect.Array && rtree.Tree[1] == reflect.Array {
+				iface := f.Interface()
+				tmp := reflect.ValueOf(iface)
+
+				for i := 0; i < tmp.Len(); i++ {
+					bd.readInterface(reflect.ValueOf(tmp.Index(i).Interface()), strings.TrimSpace(fmt.Sprintf(`%v.%v [%v]`, nameprefix, t.Name, i)))
+				}
+			} else {
+
+				bd.readInterface(f, strings.TrimSpace(fmt.Sprintf(`%v.%v`, nameprefix, t.Name)))
+			}
+
+			rtree.Tree = []reflect.Kind{}
 		}
 
 	case reflect.Array:
@@ -144,7 +159,7 @@ func (bd *ReaderDumper) nextColor() {
 	}
 }
 
-func (bd *ReaderDumper) getColor() clr.Color {
+func (bd *ReaderDumper) getVariableColor() clr.Color {
 	return bd.valuePerimeterColors[bd.lastVPC]
 }
 
@@ -169,7 +184,7 @@ func (bd *ReaderDumper) Dump() string {
 
 		for idx := uint64(0); idx < item.Size; idx += 16 {
 			// Print starting offset
-			sb.WriteString(clr.Sprintf(`%08[1]x  `, clr.Colorize(startingOffset+Offset(idx), bd.getColor())))
+			sb.WriteString(clr.Sprintf(`%08[1]x  `, clr.Colorize(startingOffset+Offset(idx), bd.getVariableColor())))
 
 			paddingRequired := 16
 
@@ -238,7 +253,8 @@ func (bd *ReaderDumper) Dump() string {
 				sb.WriteString(` `)
 			}
 
-			sb.WriteString(clr.Sprintf(`%[1]v: L: 0x%02[2]X %[2]v (%[3]v %[4]v)`, clr.Colorize(item.Name, bd.getColor()), item.Size, clr.Bold(item.Kind), item.Type))
+			sb.WriteString(clr.Sprintf(`%[1]v: L: 0x%02[2]X %[2]v (%[3]v %[4]v)`, clr.Colorize(item.Name, bd.getVariableColor()), item.Size, clr.Bold(item.Kind), item.Type))
+
 			sb.WriteString("\n")
 		}
 
