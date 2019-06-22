@@ -105,11 +105,9 @@ type SongRaw struct {
 }
 
 func main() {
-	bu := bytes.NewReader(testData)
-
 	var song SongRaw
 
-	a := annotatorreader.New(binary.BigEndian, bu)
+	a := annotatorreader.New(binary.BigEndian, bytes.NewReader(testData))
 
 	err := a.Marshal(&song, "song")
 	if err != nil {
@@ -123,6 +121,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf(`%v`, a.Dump())
+	fmt.Println()
+	fmt.Println(a.Dump())
 
 }
