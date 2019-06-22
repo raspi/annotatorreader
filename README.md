@@ -8,6 +8,10 @@ Sometimes you need to make sense of weird binary file formats and reading a hex 
 
 So normally while you are constructing those structs you usually are guessing the types from non-existing documentation. Now you can get a nice clear hex dump of what's going on and where.
 
+## Install
+
+    go get -u github.com/raspi/annotatorreader
+
 ## Example
 
 Turn this:
