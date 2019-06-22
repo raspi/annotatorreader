@@ -85,13 +85,15 @@ func (bd *ReaderDumper) readInterface(v reflect.Value, name string) {
 
 		s := uint64(binary.Size(iface))
 
+		tree := reflTree{}
+		tree.getTree(v)
+
 		bd.DebugInfo[bd.currentOffset] = DebugInformation{
 			Size:     s,
 			Name:     name,
-			Kind:     v.Kind(),
+			KindTree: tree.Tree,
 			Type:     v.Type(),
 			Value:    val,
-			LastKind: bd.getLastKind(reflect.ValueOf(val)),
 		}
 
 		bd.currentOffset += Offset(s)
@@ -109,13 +111,13 @@ func (bd *ReaderDumper) Marshal(data interface{}, nameprefix string) (err error)
 		return err
 	}
 
+	err = binary.Read(bd.r, bd.Endian, data)
+	if err != nil {
+		return err
+	}
+
 	switch rdt.Kind() {
 	case reflect.Struct:
-		err = binary.Read(bd.r, bd.Endian, data)
-		if err != nil {
-			return err
-		}
-
 		var rtree reflTree
 
 		for i := 0; i < rdv.NumField(); i++ {
@@ -148,13 +150,6 @@ func (bd *ReaderDumper) Marshal(data interface{}, nameprefix string) (err error)
 	}
 
 	return err
-}
-
-func (bd *ReaderDumper) getLastKind(v reflect.Value) reflect.Kind {
-	v = bd.unpackValue(v)
-	tree := reflTree{}
-	tree.getTree(v)
-	return tree.Tree[len(tree.Tree)-1]
 }
 
 func (bd *ReaderDumper) readBytes(data []byte) (n int, err error) {
@@ -234,7 +229,7 @@ func (bd *ReaderDumper) Dump() string {
 					color = clr.WhiteFg
 				}
 
-				color = bd.getHighlightEffect(item.LastKind, color, i)
+				color = bd.getHighlightEffect(item.KindTree[len(item.KindTree)-1], color, i)
 
 				sb.WriteString(clr.Sprintf(`%02x`, clr.Colorize(b, color)))
 
@@ -273,7 +268,7 @@ func (bd *ReaderDumper) Dump() string {
 					color = clr.WhiteFg
 				}
 
-				color = bd.getHighlightEffect(item.LastKind, color, i)
+				color = bd.getHighlightEffect(item.KindTree[len(item.KindTree)-1], color, i)
 
 				sb.WriteString(fmt.Sprintf(`%c`, clr.Colorize(bd.toChar(b), color)))
 
@@ -295,19 +290,40 @@ func (bd *ReaderDumper) Dump() string {
 			sb.WriteString(clr.Sprintf(`L: 0x%02[1]X %[1]v `, item.Size))
 
 			if item.Value != nil {
-				// Value
-				switch (*item.Value).(type) {
-				case uint8, int8:
-					sb.WriteString(clr.Sprintf(`V: 0x%02[1]x %[1]v`, *item.Value))
-				case uint16, int16:
-					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
-				case uint32, int32:
-					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
-				case uint64, int64:
-					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
-				case uint, int:
-					sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+				if item.KindTree[0] == reflect.Array {
+					switch item.KindTree[len(item.KindTree)-1] {
+					case reflect.Uint16, reflect.Int16:
+						arv := reflect.ValueOf(*item.Value)
+
+						for j := 0; j < arv.Len(); j++ {
+							if j%8 == 0 {
+								sb.WriteString("\n")
+								sb.WriteString(strings.Repeat(` `, 81))
+							}
+
+							sb.WriteString(clr.Sprintf("0x%04[1]x %04[1]v", arv.Index(j).Interface()))
+							sb.WriteString(" ")
+						}
+					}
+				} else {
+					// Value
+					switch (*item.Value).(type) {
+					case uint8, int8:
+						sb.WriteString(clr.Sprintf(`V: 0x%02[1]x %[1]v`, *item.Value))
+					case uint16, int16:
+						sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+					case uint32, int32:
+						sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+					case uint64, int64:
+						sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+					case uint, int:
+						sb.WriteString(clr.Sprintf(`V: 0x%04[1]x %[1]v`, *item.Value))
+					}
+
 				}
+
+			} else {
+				sb.WriteString(`V: <nil>`)
 			}
 
 			sb.WriteString("\n")
